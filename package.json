@@ -15,7 +15,7 @@
     "@langchain/core": "^0.3.19",
     "@langchain/openai": "^0.3.14",
     "@nevermined-io/payments": "^0.8.0",
-    "axios": "^1.7.9",
+    "axios": "^1.8.2",
     "dotenv": "^16.4.7",
     "music-metadata": "7.13.3"
   },
