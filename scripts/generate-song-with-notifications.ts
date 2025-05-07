@@ -121,17 +121,38 @@ async function startServer(): Promise<void> {
 /**
  * Creates a new song generation task and sets up push notifications
  * @param {Object} params Song generation parameters
+ * @param {string} [params.idea] The main idea or prompt for the song
+ * @param {string} [params.title] The title of the song
+ * @param {string[]} [params.tags] Tags for the song
+ * @param {string} [params.lyrics] Lyrics for the song
+ * @param {number} [params.duration] Duration of the song in seconds
+ * @param {string} [params.sessionId] Optional session ID
  * @returns {Promise<string>} Task ID
  */
 async function createSongTask(params: {
-  prompt: string;
-  style?: string;
+  idea?: string;
+  title?: string;
+  tags?: string[];
+  lyrics?: string;
   duration?: number;
+  sessionId?: string;
 }): Promise<string> {
   try {
+    // Build the message and metadata according to A2A
+    const message = {
+      role: "user",
+      parts: [{ type: "text", text: params.idea || "" }],
+    };
+    const metadata: Record<string, any> = {};
+    if (params.title) metadata.title = params.title;
+    if (params.tags) metadata.tags = params.tags;
+    if (params.lyrics) metadata.lyrics = params.lyrics;
+    if (params.duration) metadata.duration = params.duration;
+
     const taskRequest = {
-      prompt: params.prompt,
-      sessionId: uuidv4(),
+      message,
+      metadata,
+      sessionId: params.sessionId || uuidv4(),
     };
 
     console.log("Sending task request:", taskRequest);
@@ -263,12 +284,21 @@ function subscribeToTaskUpdates(taskId: string): Promise<any> {
 /**
  * Generates a song with real-time updates via SSE
  * @param {Object} songParams Parameters for song generation
+ * @param {string} [songParams.idea] The main idea or prompt for the song
+ * @param {string} [songParams.title] The title of the song
+ * @param {string[]} [songParams.tags] Tags for the song
+ * @param {string} [songParams.lyrics] Lyrics for the song
+ * @param {number} [songParams.duration] Duration of the song in seconds
+ * @param {string} [songParams.sessionId] Optional session ID
  * @returns {Promise<any>} The final song generation result
  */
 async function generateSongWithNotifications(songParams: {
-  prompt: string;
-  style?: string;
+  idea?: string;
+  title?: string;
+  tags?: string[];
+  lyrics?: string;
   duration?: number;
+  sessionId?: string;
 }): Promise<any> {
   try {
     // Ensure server is running
@@ -293,9 +323,14 @@ async function generateSongWithNotifications(songParams: {
 
 // Run the script if called directly
 if (require.main === module) {
-  const prompt =
-    process.argv[2] || "Create a happy pop song about summer adventures";
-  generateSongWithNotifications({ prompt })
+  const songParams = {
+    idea: process.argv[2] || "Create a happy pop song about summer adventures",
+    title: "Summer Vibes",
+    tags: ["pop", "happy", "summer"],
+    lyrics: "We dance all night under the summer sky...",
+    duration: 180,
+  };
+  generateSongWithNotifications(songParams)
     .then(() => process.exit(0))
     .catch((error) => {
       console.error("Script failed:", error);
