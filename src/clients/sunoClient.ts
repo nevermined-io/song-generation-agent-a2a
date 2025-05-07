@@ -224,9 +224,8 @@ export class SunoClient {
     }
 
     try {
-      console.log("CHARLS - taskId", taskId);
       const jobId = this.getJobId(taskId);
-      console.log("CHARLS - jobId", jobId);
+
       Logger.debug(
         `Checking status for taskId ${taskId} with TTAPI jobId ${jobId}`
       );
