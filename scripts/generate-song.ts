@@ -10,7 +10,7 @@ import { v4 as uuidv4 } from "uuid";
 
 // Configuration
 const CONFIG = {
-  serverUrl: process.env.SERVER_URL || "http://localhost:8000",
+  serverUrl: process.env.SERVER_URL || "http://localhost:8001",
   pollingInterval: 5000, // 5 seconds
   maxRetries: 60, // 5 minutes maximum waiting time
 };
@@ -105,14 +105,29 @@ async function startServer(): Promise<void> {
  * @returns {Promise<string>} Task ID
  */
 async function createSongTask(params: {
-  prompt: string;
-  style?: string;
+  idea?: string;
+  title?: string;
+  tags?: string[];
+  lyrics?: string;
   duration?: number;
+  sessionId?: string;
 }): Promise<string> {
   try {
+    // Build the message and metadata according to A2A
+    const message = {
+      role: "user",
+      parts: [{ type: "text", text: params.idea || "" }],
+    };
+    const metadata: Record<string, any> = {};
+    if (params.title) metadata.title = params.title;
+    if (params.tags) metadata.tags = params.tags;
+    if (params.lyrics) metadata.lyrics = params.lyrics;
+    if (params.duration) metadata.duration = params.duration;
+
     const taskRequest = {
-      prompt: params.prompt,
-      sessionId: uuidv4(),
+      message,
+      metadata,
+      sessionId: params.sessionId || uuidv4(),
     };
 
     console.log("Sending task request:", taskRequest);
@@ -170,9 +185,12 @@ async function checkTaskStatus(taskId: string): Promise<any> {
  * @returns {Promise<any>} Generated song data or error
  */
 async function generateSong(songParams: {
-  prompt: string;
-  style?: string;
+  idea?: string;
+  title?: string;
+  tags?: string[];
+  lyrics?: string;
   duration?: number;
+  sessionId?: string;
 }): Promise<any> {
   try {
     // Check if server is running
@@ -262,8 +280,10 @@ async function generateSong(songParams: {
 // Example usage
 if (require.main === module) {
   const songParams = {
-    prompt: "Create a happy pop song about summer",
-    style: "pop",
+    idea: "Create a happy pop song about summer",
+    title: "Summer Vibes",
+    tags: ["pop", "happy", "summer"],
+    lyrics: "We dance all night under the summer sky...",
     duration: 180, // 3 minutes
   };
 

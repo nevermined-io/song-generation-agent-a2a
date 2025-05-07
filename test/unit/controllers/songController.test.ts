@@ -62,6 +62,15 @@ describe("SongGenerationController", () => {
       tags: ["pop", "test"],
     };
 
+    // Mock input for SongMetadataGenerator
+    const mockMetadataInput = {
+      idea: "test prompt",
+      title: undefined,
+      tags: undefined,
+      lyrics: undefined,
+      duration: undefined,
+    };
+
     // Mock the Suno client
     const mockGenerateSongResponse: GenerateSongResponse = {
       id: "test-job-id",
@@ -151,13 +160,16 @@ describe("SongGenerationController", () => {
       expect(artifact?.metadata?.title).toBe("Test Song");
       expect(artifact?.metadata?.duration).toBe(180);
 
-      // Verify that the song generation process was initiated correctly
-      expect(mockSunoClient.generateSong).toHaveBeenCalledWith({
-        prompt: "test prompt",
-        title: "Test Song",
-        lyrics: "Test lyrics",
-        tags: ["pop", "test"],
-      });
+      // Verify that SongMetadataGenerator.generate was called with the correct input object
+      expect(SongMetadataGenerator.prototype.generate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          idea: "test prompt",
+          title: undefined,
+          tags: undefined,
+          lyrics: undefined,
+          duration: undefined,
+        })
+      );
 
       // Verify that the completion was properly waited for
       expect(mockSunoClient.waitForCompletion).toHaveBeenCalledWith(

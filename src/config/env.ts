@@ -33,7 +33,7 @@ export interface EnvConfig {
  * @description Default configuration values
  */
 export const defaultConfig: Partial<EnvConfig> = {
-  PORT: 8000,
+  PORT: 8001,
   HOST: "localhost",
   NODE_ENV: "development",
   LOG_LEVEL: "info",

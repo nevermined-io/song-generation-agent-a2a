@@ -112,7 +112,7 @@ describe("A2AController", () => {
         name: "Song Generation Agent",
         description:
           "AI agent that generates songs based on text prompts, using AI models to create lyrics and melodies",
-        url: "http://localhost:8000",
+        url: "http://localhost:8001",
         provider: {
           organization: "Nevermined",
           url: "https://nevermined.io",

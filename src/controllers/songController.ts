@@ -171,14 +171,18 @@ export class SongGenerationController {
     const { task, isCancelled } = context;
 
     try {
-      // Extract prompt from task message or task.prompt
-      const prompt =
-        task.prompt ||
-        task.message?.parts.find((p) => p.type === "text")?.text ||
-        "";
+      // Extract the main message and metadata from the task
+      const idea =
+        task.message?.parts?.find((p) => p.type === "text")?.text || "";
+      const taskMeta = task.metadata || {};
+      const title = taskMeta.title;
+      const tags = taskMeta.tags;
+      const lyrics = taskMeta.lyrics;
+      const duration = taskMeta.duration;
+      const metadataInput = { idea, title, tags, lyrics, duration };
 
-      // Validate prompt first
-      const validationUpdate = this.validatePrompt(prompt);
+      // Validate the main message
+      const validationUpdate = this.validatePrompt(idea);
       if (validationUpdate) {
         this.updateTaskHistory(task, validationUpdate);
         yield validationUpdate;
@@ -199,10 +203,12 @@ export class SongGenerationController {
       this.updateTaskHistory(task, metadataUpdate);
       yield metadataUpdate;
 
-      let metadata: SongMetadata;
+      let songMetadata: SongMetadata;
       try {
-        metadata = await this.metadataGenerator.generate(prompt);
-        Logger.info(`Generated metadata: ${JSON.stringify(metadata, null, 2)}`);
+        songMetadata = await this.metadataGenerator.generate(metadataInput);
+        Logger.info(
+          `Generated metadata: ${JSON.stringify(songMetadata, null, 2)}`
+        );
       } catch (error) {
         Logger.error(`Metadata generation error: ${(error as Error).message}`);
         const errorUpdate: TaskYieldUpdate = {
@@ -240,7 +246,7 @@ export class SongGenerationController {
 
       // Generate audio
       const audioUpdate = this.createTextMessage(
-        `Generating audio for "${metadata.title}"...`
+        `Generating audio for "${songMetadata.title}"...`
       );
       this.updateTaskHistory(task, audioUpdate);
       yield audioUpdate;
@@ -262,10 +268,10 @@ export class SongGenerationController {
         }
 
         const response = await this.sunoClient.generateSong(task.id, {
-          prompt,
-          title: metadata.title,
-          lyrics: metadata.lyrics,
-          tags: metadata.tags,
+          prompt: idea,
+          title: songMetadata.title,
+          lyrics: songMetadata.lyrics,
+          tags: songMetadata.tags,
         });
 
         if (!response?.id) {
@@ -341,11 +347,11 @@ export class SongGenerationController {
             parts: [
               {
                 type: "text",
-                text: `Song "${metadata.title}" has been generated successfully!`,
+                text: `Song "${songMetadata.title}" has been generated successfully!`,
               },
             ],
           },
-          artifacts: [this.createArtifact(songData, metadata)],
+          artifacts: [this.createArtifact(songData, songMetadata)],
         };
 
         this.updateTaskHistory(task, finalUpdate);

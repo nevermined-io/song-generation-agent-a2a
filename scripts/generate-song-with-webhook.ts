@@ -12,7 +12,7 @@ import { AddressInfo } from "net";
 
 // Configuration
 const CONFIG = {
-  serverUrl: process.env.SERVER_URL || "http://localhost:8000",
+  serverUrl: process.env.SERVER_URL || "http://localhost:8001",
   webhookPort: 4001,
   webhookPath: "/webhook-test-client",
   eventTypes: ["status_update", "completion"],

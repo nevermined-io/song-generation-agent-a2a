@@ -12,12 +12,21 @@ import { SongMetadata } from "../models/song";
 import { Logger } from "../utils/logger";
 
 /**
+ * @typedef {Object} SongMetadataInput
+ * @property {string} idea - Main concept or prompt for the song (from message.parts[0].text)
+ * @property {string} [title] - The title of the song (from metadata.title)
+ * @property {string[]} [tags] - List of genre tags or themes for the song (from metadata.tags)
+ * @property {string} [lyrics] - Specific lyrics or text to include in the song (from metadata.lyrics)
+ * @property {number} [duration] - Approximate duration of the song in seconds (from metadata.duration)
+ */
+
+/**
  * @class SongMetadataGenerator
  * @description Generates structured song metadata using LangChain and OpenAI
  */
 export class SongMetadataGenerator {
   private chain: RunnableSequence;
-  private readonly MODEL = "gpt-4-turbo-preview";
+  private readonly MODEL = "gpt-4o-mini";
 
   /**
    * @constructor
@@ -35,46 +44,56 @@ export class SongMetadataGenerator {
       temperature: 0.7,
     });
 
-    const promptTemplate = ChatPromptTemplate.fromTemplate(`
-      You are a professional songwriter and music metadata expert. Generate complete song metadata based on this concept: {idea}
-      
-      If the input is empty or invalid, respond with "INVALID INPUT".
-      
-      For valid inputs, output a JSON object with this structure:
-      {{
-        "title": "A creative title (max 60 chars)",
-        "lyrics": "Full lyrics with sections",
-        "tags": ["genre", "style", "mood"]
-      }}
-
-      The lyrics MUST include these EXACT sections in order:
-      [Verse 1]
-      First verse lyrics here
-      [Verse 2]
-      Second verse lyrics here
-      [Chorus]
-      Chorus lyrics here
-      [Verse 3]
-      Third verse lyrics here
-      [Chorus]
-      Chorus lyrics here
-      
-      Rules:
-      1. No special punctuation in title
-      2. No double quotes in lyrics (use single quotes if needed)
-      3. MUST include ALL required sections with EXACT labels: [Verse 1], [Verse 2], [Verse 3], [Chorus]
-      4. Include performance notes in square brackets like [Soft], [Build up]
-      5. Output ONLY the JSON, no explanations or additional text
-      6. The JSON must be properly formatted and escaped
-      7. Tags must be an array of 3-5 strings for genre, style, and mood
-    `);
-
+    // Prompt template will be built dynamically in generate()
     this.chain = RunnableSequence.from([
-      promptTemplate,
+      // Placeholder, replaced in generate()
+      async (input: any) => input.prompt,
       llm,
       this.extractJson,
       new JsonOutputParser<SongMetadata>(),
     ]);
+  }
+
+  /**
+   * @private
+   * @method buildPrompt
+   * @description Builds the prompt dynamically based on provided fields. If a field is present, the LLM must respect it; otherwise, it must generate it.
+   * @param {SongMetadataInput} input - The input object
+   * @returns {string} The constructed prompt
+   */
+  private buildPrompt(input: any): string {
+    // Build the partial object only with the present fields
+    const partialMetadata: Record<string, any> = {};
+    if (input.title) partialMetadata.title = input.title;
+    if (input.lyrics) partialMetadata.lyrics = input.lyrics;
+    if (input.tags && Array.isArray(input.tags) && input.tags.length > 0)
+      partialMetadata.tags = input.tags;
+    if (input.idea) partialMetadata.idea = input.idea;
+    if (input.duration) partialMetadata.duration = input.duration;
+
+    return `You are a professional songwriter and music metadata expert.
+You will receive a partial song metadata object. Some fields may already be provided (title, tags, lyrics, idea, duration) and MUST be respected exactly as given.
+For any missing fields, generate creative and appropriate values to complete the metadata.
+
+Return a JSON object with this structure:
+{
+  "title": "...",
+  "lyrics": "...",
+  "tags": [ ... ],
+  "idea": "...",
+  "duration": ...
+}
+
+Rules:
+- If a field is provided, use it exactly as given, EXCEPT for lyrics: if lyrics are present but seem incomplete for the song's duration or context, complete them naturally and coherently, keeping the original content.
+- If a field is missing, generate it.
+- If you generate lyrics, include section metadata like [verse], [chorus], [solo], [intro], [instrumental], etc., to provide more context and structure to the song.
+- Output ONLY the JSON, no explanations or additional text.
+- The JSON must be properly formatted and escaped.
+
+Partial metadata provided:
+${JSON.stringify(partialMetadata, null, 2)}
+`;
   }
 
   /**
@@ -194,25 +213,36 @@ export class SongMetadataGenerator {
   /**
    * @async
    * @method generate
-   * @description Generates song metadata from a concept/idea
-   * @param {string} idea - The song concept
+   * @description Generates song metadata from a set of parameters
+   * @param {SongMetadataInput} input - The song metadata input object
    * @returns {Promise<SongMetadata>} Generated metadata
    * @throws {Error} If generation or validation fails
    */
-  async generate(idea: string): Promise<SongMetadata> {
-    if (!idea || idea.trim() === "") {
+  async generate(input: any): Promise<SongMetadata> {
+    if (
+      !input ||
+      typeof input !== "object" ||
+      !input.idea ||
+      input.idea.trim() === ""
+    ) {
       throw new Error("Cannot generate song metadata from empty input");
     }
-
     try {
-      Logger.debug(`Generating metadata for idea: ${idea}`);
-      const metadata = await this.chain.invoke({ idea });
-      this.validateMetadata(metadata);
+      Logger.debug(`Generating metadata for input: ${JSON.stringify(input)}`);
+      const prompt = this.buildPrompt(input);
+      // Rebuild the chain with the new prompt
+      const chain = RunnableSequence.from([
+        async () => prompt,
+        this.chain.steps[1], // llm
+        this.extractJson,
+        new JsonOutputParser<SongMetadata>(),
+      ]);
+      const metadata = await chain.invoke({});
+      this.validateMetadata(metadata, input);
       return metadata;
     } catch (error) {
       const message = (error as Error).message;
       Logger.debug(`Metadata generation error: ${message}`);
-
       if (
         message.includes("Json not found") ||
         message.includes("No valid JSON found")
@@ -229,38 +259,26 @@ export class SongMetadataGenerator {
   /**
    * @private
    * @method validateMetadata
-   * @description Validates the generated metadata
+   * @description Validates the generated metadata, ensuring it respects user input if provided
    * @param {SongMetadata} metadata - The metadata to validate
+   * @param {SongMetadataInput} input - The original input object
    * @throws {Error} If validation fails
    */
-  private validateMetadata(metadata: SongMetadata): void {
+  private validateMetadata(metadata: SongMetadata, input?: any): void {
     if (!metadata.title?.trim()) {
       throw new Error("Invalid or missing title");
     }
-
     if (!metadata.lyrics?.trim()) {
       throw new Error("Invalid or missing lyrics");
     }
-
     if (!Array.isArray(metadata.tags) || metadata.tags.length < 3) {
       throw new Error("Invalid or insufficient tags");
     }
-
     if (metadata.title.length > 60) {
       throw new Error("Title too long");
     }
-
-    // Count verses using the format [Verse X]
-    const verseCount = (metadata.lyrics.match(/\[Verse \d+\]/g) || []).length;
-    if (verseCount < 3) {
-      throw new Error("Lyrics must contain at least 3 verses");
+    if (Array.isArray(metadata.tags)) {
+      metadata.tags = metadata.tags.map((tag) => tag.trim().toLowerCase());
     }
-
-    if (!metadata.lyrics.includes("[Chorus]")) {
-      throw new Error("Lyrics must contain at least one chorus");
-    }
-
-    // Clean up tags
-    metadata.tags = metadata.tags.map((tag) => tag.trim().toLowerCase());
   }
 }

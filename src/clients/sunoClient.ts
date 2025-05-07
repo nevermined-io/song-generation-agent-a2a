@@ -276,7 +276,7 @@ export class SunoClient {
     taskId: string,
     options: WaitForCompletionOptions = {}
   ): AsyncGenerator<StatusData, SongResponse> {
-    const { timeout = 300000, interval = 5000, onStatusUpdate } = options;
+    const { timeout = 400000, interval = 5000, onStatusUpdate } = options;
     const startTime = Date.now();
     const jobId = this.getJobId(taskId);
     Logger.debug(

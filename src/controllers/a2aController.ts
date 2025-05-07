@@ -158,7 +158,7 @@ export class A2AController {
       name: "Song Generation Agent",
       description:
         "AI agent that generates songs based on text prompts, using AI models to create lyrics and melodies. Supports real-time updates via SSE (streaming) and push notifications via webhook.",
-      url: "http://localhost:8000",
+      url: "http://localhost:8001",
       provider: {
         organization: "Nevermined",
         url: "https://nevermined.io",
@@ -261,8 +261,25 @@ export class A2AController {
    */
   public sendTask = async (req: Request, res: Response): Promise<void> => {
     try {
-      Logger.info(`Sending task: ${req.body.prompt}`);
-      const task = await this.createTask(req.body.prompt, req.body.sessionId);
+      Logger.info(`Sending task: ${JSON.stringify(req.body)}`);
+      const { message, metadata, sessionId } = req.body;
+      if (
+        !message ||
+        !message.parts ||
+        !message.parts[0] ||
+        !message.parts[0].text ||
+        !message.parts[0].text.trim()
+      ) {
+        res
+          .status(400)
+          .json({ error: "Task must contain a non-empty message text" });
+        return;
+      }
+      const task = await this.createTask({
+        sessionId,
+        message,
+        metadata,
+      });
       res.json(task);
     } catch (error) {
       if (error instanceof Error) {
@@ -340,24 +357,23 @@ export class A2AController {
    * @method createTask
    * @description Create and enqueue a new task
    */
-  public async createTask(prompt: string, sessionId?: string): Promise<Task> {
+  public async createTask(params: {
+    sessionId?: string;
+    message: Message;
+    metadata?: Record<string, any>;
+  }): Promise<Task> {
     try {
-      // Create initial message
-      const message: Message = {
-        role: "user",
-        parts: [{ type: "text", text: prompt }],
-      };
-
+      const { sessionId, message, metadata } = params;
       // Create new task
       const task: Task = {
         id: crypto.randomUUID(),
-        prompt,
+        sessionId,
         status: {
           state: TaskState.SUBMITTED,
           timestamp: new Date().toISOString(),
         },
         message,
-        sessionId,
+        metadata,
       };
 
       // Store task first
@@ -475,8 +491,24 @@ export class A2AController {
     res: Response
   ): Promise<void> => {
     try {
-      // Create and store the task
-      const task = await this.createTask(req.body.prompt, req.body.sessionId);
+      const { message, metadata, sessionId } = req.body;
+      if (
+        !message ||
+        !message.parts ||
+        !message.parts[0] ||
+        !message.parts[0].text ||
+        !message.parts[0].text.trim()
+      ) {
+        res
+          .status(400)
+          .json({ error: "Task must contain a non-empty message text" });
+        return;
+      }
+      const task = await this.createTask({
+        sessionId,
+        message,
+        metadata,
+      });
 
       // Send the task response immediately
       res.json(task);

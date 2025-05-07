@@ -11,7 +11,7 @@ import EventSource from "eventsource";
 
 // Configuration
 const CONFIG = {
-  serverUrl: process.env.SERVER_URL || "http://localhost:8000",
+  serverUrl: process.env.SERVER_URL || "http://localhost:8001",
   maxConnectionAttempts: 5,
   reconnectDelay: 1000, // 1 second
 };
