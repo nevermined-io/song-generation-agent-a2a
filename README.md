@@ -273,6 +273,52 @@ The agent implements the **A2A** (Agent-to-Agent) protocol, which defines:
 - **SSE**: Subscribe to `/tasks/:taskId/notifications` to receive real-time events.
 - **Webhooks**: Register an endpoint via `/tasks/:taskId/notifications` (POST) to receive push events.
 
+**A2A Protocol and API Endpoints**
+----------------------------------
+
+All API endpoints for task creation now require **JSON-RPC 2.0** requests and responses, as per the A2A protocol. This applies to both `/tasks/send` and `/tasks/sendSubscribe`.
+
+- **Endpoint for single-turn tasks:**
+  - `POST /tasks/send`
+- **Endpoint for streaming/multi-turn tasks:**
+  - `POST /tasks/sendSubscribe`
+
+**Request format (JSON-RPC 2.0):**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "client-request-id",
+  "method": "tasks/sendSubscribe", // or "tasks/send"
+  "params": {
+    "id": "unique-task-id",
+    "sessionId": "user-session-123",
+    "acceptedOutputModes": ["text"],
+    "message": {
+      "role": "user",
+      "parts": [
+        { "type": "text", "text": "Create a happy pop song about summer" }
+      ]
+    },
+    "metadata": {}
+  }
+}
+```
+
+**Response format (JSON-RPC 2.0):**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "client-request-id",
+  "result": {
+    // ...task object...
+  }
+}
+```
+
+> **Note:** All scripts and clients must use this JSON-RPC 2.0 envelope for requests and expect the same for responses. See the updated example scripts for reference.
+
 * * *
 
 **Usage**

@@ -40,7 +40,7 @@ export const defaultConfig: Partial<EnvConfig> = {
   MAX_CONCURRENT_TASKS: 1,
   MAX_RETRIES: 3,
   RETRY_DELAY: 1000,
-  TASK_TIMEOUT: 300000, // 5 minutes
+  TASK_TIMEOUT: 400000, // 5 minutes
 };
 
 /**

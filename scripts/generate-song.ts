@@ -1,7 +1,9 @@
 /**
- * Script to generate a song using the Nevermined agent
+ * Script to generate a song using the Nevermined agent (A2A JSON-RPC 2.0)
  * It checks if the server is running, starts it if needed,
  * creates a song generation task and polls for its completion
+ *
+ * This script is now fully compliant with the A2A protocol (JSON-RPC 2.0).
  */
 
 import axios, { AxiosError } from "axios";
@@ -100,7 +102,7 @@ async function startServer(): Promise<void> {
 }
 
 /**
- * Creates a new song generation task
+ * Creates a new song generation task using JSON-RPC 2.0 (A2A protocol)
  * @param {Object} params Song generation parameters
  * @returns {Promise<string>} Task ID
  */
@@ -124,19 +126,29 @@ async function createSongTask(params: {
     if (params.lyrics) metadata.lyrics = params.lyrics;
     if (params.duration) metadata.duration = params.duration;
 
-    const taskRequest = {
-      message,
-      metadata,
-      sessionId: params.sessionId || uuidv4(),
+    // JSON-RPC 2.0 request body
+    const jsonRpcRequest = {
+      jsonrpc: "2.0",
+      id: uuidv4(),
+      method: "tasks/send",
+      params: {
+        id: uuidv4(),
+        sessionId: params.sessionId || uuidv4(),
+        message,
+        metadata,
+      },
     };
 
-    console.log("Sending task request:", taskRequest);
+    console.log("Sending JSON-RPC 2.0 task request:", jsonRpcRequest);
     const response = await axios.post(
       `${CONFIG.serverUrl}/tasks/send`,
-      taskRequest
+      jsonRpcRequest
     );
     console.log("Server response:", response.data);
-    return response.data.id;
+    if (response.data && response.data.result && response.data.result.id) {
+      return response.data.result.id;
+    }
+    throw new Error("Invalid response from server: missing result.id");
   } catch (error) {
     if (error instanceof AxiosError) {
       console.error("API Response:", error.response?.data);

@@ -1,7 +1,9 @@
 /**
- * Script to generate a song using the Nevermined agent with SSE notifications
+ * Script to generate a song using the Nevermined agent with SSE notifications (A2A JSON-RPC 2.0)
  * Instead of polling, it subscribes to server events to get real-time updates
  * about the song generation progress
+ *
+ * This script is now fully compliant with the A2A protocol (JSON-RPC 2.0).
  */
 
 import axios, { AxiosError } from "axios";
@@ -119,7 +121,7 @@ async function startServer(): Promise<void> {
 }
 
 /**
- * Creates a new song generation task and sets up push notifications
+ * Creates a new song generation task and sets up push notifications (JSON-RPC 2.0)
  * @param {Object} params Song generation parameters
  * @param {string} [params.idea] The main idea or prompt for the song
  * @param {string} [params.title] The title of the song
@@ -149,20 +151,30 @@ async function createSongTask(params: {
     if (params.lyrics) metadata.lyrics = params.lyrics;
     if (params.duration) metadata.duration = params.duration;
 
-    const taskRequest = {
-      message,
-      metadata,
-      sessionId: params.sessionId || uuidv4(),
+    // JSON-RPC 2.0 request body
+    const jsonRpcRequest = {
+      jsonrpc: "2.0",
+      id: uuidv4(),
+      method: "tasks/sendSubscribe",
+      params: {
+        id: uuidv4(),
+        sessionId: params.sessionId || uuidv4(),
+        message,
+        metadata,
+        acceptedOutputModes: ["text"],
+      },
     };
 
-    console.log("Sending task request:", taskRequest);
+    console.log("Sending JSON-RPC 2.0 task request:", jsonRpcRequest);
     const response = await axios.post(
       `${CONFIG.serverUrl}/tasks/sendSubscribe`,
-      taskRequest
+      jsonRpcRequest
     );
     console.log("Server response:", response.data);
-
-    return response.data.id;
+    if (response.data && response.data.result && response.data.result.id) {
+      return response.data.result.id;
+    }
+    throw new Error("Invalid response from server: missing result.id");
   } catch (error) {
     if (error instanceof AxiosError) {
       console.error("API Response:", error.response?.data);

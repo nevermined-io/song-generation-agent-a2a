@@ -281,7 +281,7 @@ export class SongGenerationController {
         // Wait for completion with status updates
         let lastProgress = 0;
         for await (const status of this.sunoClient.waitForCompletion(task.id, {
-          timeout: 300000,
+          timeout: 400000,
           interval: 5000,
           onStatusUpdate: (status: StatusData) => {
             if (isCancelled()) {

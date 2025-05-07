@@ -257,12 +257,22 @@ export class A2AController {
 
   /**
    * @method sendTask
-   * @description Create and send a new task
+   * @description Handle JSON-RPC 2.0 A2A task send (single-turn)
+   * @param {Request} req - Express request
+   * @param {Response} res - Express response
    */
   public sendTask = async (req: Request, res: Response): Promise<void> => {
     try {
-      Logger.info(`Sending task: ${JSON.stringify(req.body)}`);
-      const { message, metadata, sessionId } = req.body;
+      const { jsonrpc, id, method, params } = req.body;
+      if (jsonrpc !== "2.0" || !id || !method || !params) {
+        res.status(400).json({
+          jsonrpc: "2.0",
+          id: id || null,
+          error: { code: -32600, message: "Invalid JSON-RPC 2.0 request" },
+        });
+        return;
+      }
+      const { message, metadata, sessionId, acceptedOutputModes } = params;
       if (
         !message ||
         !message.parts ||
@@ -270,22 +280,33 @@ export class A2AController {
         !message.parts[0].text ||
         !message.parts[0].text.trim()
       ) {
-        res
-          .status(400)
-          .json({ error: "Task must contain a non-empty message text" });
+        res.status(400).json({
+          jsonrpc: "2.0",
+          id,
+          error: {
+            code: -32602,
+            message: "Task must contain a non-empty message text",
+          },
+        });
         return;
       }
       const task = await this.createTask({
         sessionId,
         message,
         metadata,
+        acceptedOutputModes,
       });
-      res.json(task);
+      res.json({
+        jsonrpc: "2.0",
+        id,
+        result: task,
+      });
     } catch (error) {
-      if (error instanceof Error) {
-        Logger.error(`Error sending task: ${error.message}`);
-      }
-      ErrorHandler.handleHttpError(error as Error, res);
+      res.status(500).json({
+        jsonrpc: "2.0",
+        id: req.body?.id || null,
+        error: { code: -32000, message: (error as Error).message },
+      });
     }
   };
 
@@ -361,9 +382,10 @@ export class A2AController {
     sessionId?: string;
     message: Message;
     metadata?: Record<string, any>;
+    acceptedOutputModes?: string[];
   }): Promise<Task> {
     try {
-      const { sessionId, message, metadata } = params;
+      const { sessionId, message, metadata, acceptedOutputModes } = params;
       // Create new task
       const task: Task = {
         id: crypto.randomUUID(),
@@ -484,14 +506,25 @@ export class A2AController {
 
   /**
    * @method sendTaskSubscribe
-   * @description Create and send a new task with subscription for real-time updates
+   * @description Handle JSON-RPC 2.0 A2A task send with subscription (multi-turn/streaming)
+   * @param {Request} req - Express request
+   * @param {Response} res - Express response
    */
   public sendTaskSubscribe = async (
     req: Request,
     res: Response
   ): Promise<void> => {
     try {
-      const { message, metadata, sessionId } = req.body;
+      const { jsonrpc, id, method, params } = req.body;
+      if (jsonrpc !== "2.0" || !id || !method || !params) {
+        res.status(400).json({
+          jsonrpc: "2.0",
+          id: id || null,
+          error: { code: -32600, message: "Invalid JSON-RPC 2.0 request" },
+        });
+        return;
+      }
+      const { message, metadata, sessionId, acceptedOutputModes } = params;
       if (
         !message ||
         !message.parts ||
@@ -499,29 +532,36 @@ export class A2AController {
         !message.parts[0].text ||
         !message.parts[0].text.trim()
       ) {
-        res
-          .status(400)
-          .json({ error: "Task must contain a non-empty message text" });
+        res.status(400).json({
+          jsonrpc: "2.0",
+          id,
+          error: {
+            code: -32602,
+            message: "Task must contain a non-empty message text",
+          },
+        });
         return;
       }
       const task = await this.createTask({
         sessionId,
         message,
         metadata,
+        acceptedOutputModes,
       });
-
-      // Send the task response immediately
-      res.json(task);
-
-      // Enqueue the task for processing
+      // Respond immediately with JSON-RPC envelope
+      res.json({
+        jsonrpc: "2.0",
+        id,
+        result: task,
+      });
+      // Enqueue the task for processing (do not await)
       await this.taskQueue.enqueueTask(task);
     } catch (error) {
-      Logger.error(
-        `Error in sendTaskSubscribe: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
-      ErrorHandler.handleHttpError(error as Error, res);
+      res.status(500).json({
+        jsonrpc: "2.0",
+        id: req.body?.id || null,
+        error: { code: -32000, message: (error as Error).message },
+      });
     }
   };
 
