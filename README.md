@@ -3,7 +3,7 @@
 Song Generator Agent (TypeScript)
 =================================
 
-> A TypeScript agent that listens for tasks via the **Nevermined Payments** framework, automatically generates lyrics and other metadata using **LangChain** + **OpenAI**, and then produces a final song audio track through **Suno**’s AI Music Generation API. It manages multiple steps internally, uses a modular architecture, and can be easily scaled or extended.
+> A TypeScript agent that listens for tasks via the **a2a** protocol, automatically generates lyrics and metadata using **LangChain** + **OpenAI**, and produces the final audio track through the **Suno** AI Music Generation API. It manages multiple steps internally, uses a modular architecture, and supports real-time notifications (SSE) and webhooks.
 
 * * *
 
@@ -12,33 +12,28 @@ Song Generator Agent (TypeScript)
 
 The **Song Generator Agent** is designed to:
 
-1.  **Receive** prompts or “ideas” for songs (e.g., “A futuristic R&B track about neon cities”).
-2.  **Optionally** generate missing metadata (e.g., lyrics, title, tags) using **LangChain** and **OpenAI**.
-3.  **Invoke** the **Suno** API to synthesize an audio track (MP3) based on the prompt + metadata.
-4.  **Output** the final track’s URL, title, duration, and lyrics.
-5.  **Integrate** seamlessly with **Nevermined Payments**, listening for “step-updated” events and updating steps as they progress or fail.
+1.  **Receive** prompts or ideas for songs (e.g., "A futuristic ballad about neon cities").
+2.  **Generate** missing metadata (lyrics, title, tags) using **LangChain** and **OpenAI**.
+3.  **Invoke** the **Suno** API to synthesize the audio track (MP3) based on the prompt and metadata.
+4.  **Output** the final track's URL, title, duration, and lyrics.
 
-This agent is well-suited for multi-step AI workflows where you want to automate music production.
+This agent implements the **A2A** (Agent-to-Agent) protocol, enabling standard orchestration and communication between Nevermined agents and third parties.
 
 * * *
 
 **Related Projects**
 --------------------
 
-This **Song Generator Agent** is part of a larger ecosystem of AI-driven media creation. For a complete view of how multiple agents work together, see:
+This **Song Generator Agent** is part of an AI-powered multimedia creation ecosystem. To see how it interacts with other agents:
 
 1.  [Music Video Orchestrator Agent](https://github.com/nevermined-io/music-video-orchestrator)
-    
-    *   Coordinates end-to-end workflows: collects user prompts, splits them into tasks, pays agents in multiple tokens, merges final output.
+    * Orchestrates end-to-end workflows: collects prompts, splits tasks, pays agents, merges results.
 2.  [Script Generator Agent](https://github.com/nevermined-io/movie-script-generator-agent)
-
-*   Generates cinematic scripts, extracts scene info, identifies settings and characters, producing prompts for video generation.
+    * Generates cinematic scripts, extracts scenes and characters, produces prompts for video.
 3.  [Image / Video Generator Agent](https://github.com/nevermined-io/video-generator-agent)
-    
-    *   Produces Images / Video using 3rd party wrapper APIs (Fal.ai and TTapi, wrapping Flux and Kling.ai)
+    * Produces images/video using third-party APIs (Fal.ai, TTapi, Flux, Kling.ai).
 
-
-**Workflow Example**:
+**Workflow example:**
 
 ```
 [ User Prompt ] --> [Music Orchestrator] --> [Song Generation] --> [Script Generation] --> [Image/Video Generation] --> [Final Compilation]
@@ -49,40 +44,40 @@ This **Song Generator Agent** is part of a larger ecosystem of AI-driven media c
 **Table of Contents**
 ---------------------
 
-*   [Features](#features)
-*   [Prerequisites](#prerequisites)
-*   [Installation](#installation)
-*   [Environment Variables](#environment-variables)
-*   [Project Structure](#project-structure)
-*   [Architecture & Workflow](#architecture--workflow)
-*   [Usage](#usage)
-*   [How It Works Internally](#how-it-works-internally)
-*   [Development & Testing](#development--testing)
-*   [License](#license)
+1. [Features](#features)
+2. [Prerequisites](#prerequisites)
+3. [Installation](#installation)
+4. [Environment Variables](#environment-variables)
+5. [Project Structure](#project-structure)
+6. [Architecture & Workflow](#architecture--workflow)
+7. [A2A Protocol](#a2a-protocol)
+8. [Usage](#usage)
+9. [Detailed Guide: Examples & Scripts](#detailed-guide-examples--scripts)
+10. [Development & Testing](#development--testing)
+11. [License](#license)
 
 * * *
 
 **Features**
-------------
+-------------
 
-*   **Nevermined Integration**: Subscribes to tasks via `step-updated` events and updates them automatically.
-*   **Automatic Metadata Generation**: Uses **LangChain** + **OpenAI** for lyrics, titles, and tag creation.
-*   **Suno Music Generation**: Calls Suno’s AI for track synthesis, monitors progress, and retrieves the final MP3.
-*   **Concurrent Step Handling**: Splits tasks into multiple steps (e.g., `autoGenerateMetadata`, `buildSong`), each with its own logic.
-*   **Configurable**: Customize your prompts, model versions, or usage of OpenAI.
-*   **Logging & Error Handling**: Comprehensive logs (info, success, warn, error) via a custom `Logger`.
-*   **SOLID, Modular Architecture**: Each function or class has a single responsibility, ensuring maintainability.
+* **Automatic metadata generation**: Uses **LangChain** + **OpenAI** for lyrics, titles, and tags.
+* **Music generation with Suno**: Calls Suno's AI to synthesize the track, monitors progress, and retrieves the final MP3.
+* **A2A protocol**: Full support for tasks, states, SSE notifications, and webhooks.
+* **Configurable**: Customize prompts, models, or OpenAI usage.
+* **Logging and error management**: Detailed logs (info, success, warn, error) via a custom `Logger`.
+* **Modular and SOLID architecture**: Each class/function has a clear responsibility.
+* **Real-time notifications**: Support for SSE and webhooks to receive task updates.
 
 * * *
 
 **Prerequisites**
 -----------------
 
-*   **Node.js** (>= 18.0.0 recommended)
-*   **TypeScript** (project built on ^5.7.0 or later)
-*   **Nevermined** credentials (API key, environment settings, and an `AGENT_DID`)
-*   **Suno API Key** (for music generation)
-*   **OpenAI API Key** (for metadata/lyrics generation via LangChain)
+* **Node.js** (>= 18.0.0 recommended)
+* **TypeScript** (^5.7.0 or higher)
+* **Suno API Key** (for music generation)
+* **OpenAI API Key** (for metadata/lyrics generation)
 
 * * *
 
@@ -90,181 +85,294 @@ This **Song Generator Agent** is part of a larger ecosystem of AI-driven media c
 ----------------
 
 1.  **Clone** the repository:
-    
     ```bash
-    git clone https://github.com/nevermined-io/song-generation-agent.git
-    cd song-generation-agent
+    git clone https://github.com/nevermined-io/song-generation-agent-a2a.git
+    cd song-generation-agent-a2a
     ```
-    
 2.  **Install** dependencies:
-    
     ```bash
     yarn install
     ```
-    
-3.  **Build** the project (optional for production):
-    
+3.  **Configure** the environment:
+    ```bash
+    cp .env.example .env
+    # Edit .env and add your keys
+    ```
+4.  **Build** the project (optional for production):
     ```bash
     yarn build
     ```
-    
 
 * * *
 
 **Environment Variables**
 -------------------------
 
-Rename `.env.example` to `.env` and set the required variables:
+Rename `.env.example` to `.env` and set the required keys:
 
 ```env
-SUNO_API_KEY=your_suno_api_key
-OPENAI_API_KEY=your_openai_api_key
-NVM_API_KEY=your_nevermined_api_key
-NVM_ENVIRONMENT=testing
-AGENT_DID=did:nv:xxx-song-agent
-IS_DUMMY=false
-DUMMY_JOB_ID=foobar
+SUNO_API_KEY=your_suno_key
+OPENAI_API_KEY=your_openai_key
 ```
 
-*   `SUNO_API_KEY`
-*   `OPENAI_API_KEY`
-*   `NVM_API_KEY`
-*   `NVM_ENVIRONMENT` (e.g., `testing`, `staging`, or `production`)
-*   `AGENT_DID` (identifies this Song Generator Agent)
-*   `IS_DUMMY` / `DUMMY_JOB_ID` (optional testing flags)
+* `SUNO_API_KEY`: Access to the Suno API for music generation.
+* `OPENAI_API_KEY`: Access to OpenAI for lyrics/metadata generation.
 
 * * *
 
 **Project Structure**
 ---------------------
 
-```
-.
-├── clients/
-│   └── sunoClient.ts          # Client for interacting with the Suno API
-├── config/
-│   └── env.ts                 # Loads environment variables from .env
-├── interfaces/
-│   └── apiResponses.ts        # Type definitions for Suno API responses
-├── utils/
-│   ├── logger.ts              # Logging utility with color-coded levels
-│   ├── utils.ts               # General helpers (e.g., track duration)
-│   └── checkEnv.ts            # Validates environment variables on startup
-├── songMetadataGenerator.ts   # Class that uses LangChain+OpenAI to generate metadata
-├── main.ts                    # Main entry, listens to step-updated events & routes steps
+```plaintext
+song-generation-agent-a2a/
+├── src/
+│   ├── server.ts                # Main entry point (Express)
+│   ├── routes/
+│   │   └── a2aRoutes.ts         # RESTful and A2A routes
+│   ├── controllers/
+│   │   ├── a2aController.ts     # Main A2A protocol logic
+│   │   └── songController.ts    # Song generation logic
+│   ├── core/
+│   │   ├── songMetadataGenerator.ts # Metadata generation with OpenAI
+│   │   ├── taskProcessor.ts     # Task processing
+│   │   ├── taskStore.ts         # Task storage and lifecycle
+│   │   └── ...
+│   ├── services/
+│   │   ├── pushNotificationService.ts # SSE and webhook notifications
+│   │   └── streamingService.ts  # Real-time SSE streaming
+│   ├── clients/
+│   │   └── sunoClient.ts        # Suno API client
+│   ├── interfaces/              # Types and A2A contracts
+│   ├── models/                  # Data models (Song, Task)
+│   ├── utils/                   # Utilities and logger
+│   └── config/                  # Configuration and environment variables
+├── scripts/
+│   ├── generate-song.ts                 # CLI script: polling
+│   ├── generate-song-with-notifications.ts # CLI script: SSE
+│   └── generate-song-with-webhook.ts     # CLI script: webhooks
 ├── package.json
-├── tsconfig.json
-└── README.md                  # This file
+└── README.md
 ```
-
-Key highlights:
-
-*   **`main.ts`**: Entry point that initializes **Nevermined** payments, subscribes to steps for this agent’s DID, and routes to step handlers (`handleInitStep`, `handleAutoGenerateMetadataStep`, `handleBuildSongStep`).
-*   **`songMetadataGenerator.ts`**: Orchestrates **LangChain** + **OpenAI** calls to produce lyrics, a title, and tags.
-*   **`clients/sunoClient.ts`**: Talks to the **Suno** API for generating music. It can poll for status, retrieve the final track URL, and handle errors gracefully.
 
 * * *
 
 **Architecture & Workflow**
 ---------------------------
 
-When the **Song Generator Agent** receives a new **task** (usually labeled `init` for the first step), it checks if the user provided metadata (lyrics, title, tags). If not, the agent creates an intermediate step to **auto-generate metadata** via `SongMetadataGenerator`. Finally, it proceeds to the **buildSong** step, which:
+1. **Task reception**: The agent exposes RESTful and A2A endpoints (`/tasks/send`, `/tasks/sendSubscribe`) to receive prompts and metadata.
+2. **Metadata generation**: If lyrics, title, or tags are missing, they are automatically generated using OpenAI via LangChain.
+3. **Audio generation**: The Suno API is called to create the music track.
+4. **Notifications**: The agent emits status updates and results via SSE (`/tasks/:taskId/notifications`) or webhooks.
+5. **Result delivery**: The user receives the audio URL, title, duration, and lyrics as A2A artifacts.
 
-1.  Calls **Suno** to start a music generation job.
-2.  Periodically checks the status until it’s either `SUCCESS` or `FAILED`.
-3.  Logs and returns the final audio URL, duration, and metadata to **Nevermined**.
+**Simplified flow diagram:**
 
-### Step-by-Step Flow
+```
+Client         Agent           OpenAI         Suno API
+  |             |               |               |
+  |--Task------>|               |               |
+  |             |--(if needed)->|               |
+  |             |  Generate     |               |
+  |             |  metadata     |               |
+  |             |<--------------|               |
+  |             |  Metadata     |               |
+  |             |---------------|--Generate---->|
+  |             |               |   music track |
+  |             |<------------------------------|
+  |             |   Audio generated             |
+  |<------------|   SSE/Webhook notifications   |
+  |<------------|   Final result (artifacts)    |
+```
 
-1.  **init**
-    
-    *   Checks for existing metadata in `step.input_artifacts`.
-    *   If missing, creates `autoGenerateMetadata` then `buildSong`.
-    *   Otherwise, creates `buildSong` directly.
-2.  **autoGenerateMetadata**
-    
-    *   Invokes the `SongMetadataGenerator` to produce a new title, lyrics, and tags.
-    *   Stores them in `output_artifacts`.
-3.  **buildSong**
-    
-    *   Uses `SunoClient` to create a music generation job.
-    *   Waits for completion (by periodically checking status).
-    *   Retrieves the final audio file, calculates duration, and updates `output_artifacts`.
+* * *
+
+**A2A Protocol**
+----------------
+
+The agent implements the **A2A** (Agent-to-Agent) protocol, which defines:
+
+- **Task states**: `submitted`, `working`, `input-required`, `completed`, `failed`, `cancelled`.
+- **Messages**: Standard structure with `role`, `parts` (text, audio, file, etc.).
+- **Artifacts**: Structured responses with parts (audio, text, metadata).
+- **Notifications**: Real-time updates via SSE or webhooks.
+
+**Example task lifecycle:**
+
+```
+[SUBMITTED] --> [WORKING] --> [COMPLETED]
+     |             |             
+     |             +--> [INPUT-REQUIRED]
+     |             |
+     +-------------+--> [FAILED]
+                   |
+                   +--> [CANCELLED]
+```
+
+**A2A request example (JSON-RPC):**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tasks/sendSubscribe",
+  "params": {
+    "id": "unique-task-id",
+    "sessionId": "user-session-123",
+    "acceptedOutputModes": ["text"],
+    "message": {
+      "role": "user",
+      "parts": [
+        { "type": "text", "text": "Create a happy pop song about summer" }
+      ]
+    }
+  }
+}
+```
+
+**Streaming SSE response example:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "id": "unique-task-id",
+    "status": {
+      "state": "working",
+      "timestamp": "2024-06-01T12:00:00Z",
+      "message": {
+        "role": "agent",
+        "parts": [
+          { "type": "text", "text": "Generating song metadata..." }
+        ]
+      }
+    },
+    "final": false
+  }
+}
+```
+
+**Final artifact:**
+
+```json
+{
+  "parts": [
+    { "type": "audio", "audioUrl": "https://.../song.mp3" },
+    { "type": "text", "text": "{\"title\":\"Summer Vibes\",...}" }
+  ],
+  "metadata": {
+    "title": "Summer Vibes",
+    "tags": ["pop", "happy", "summer"],
+    "duration": 180
+  },
+  "index": 0
+}
+```
+
+**Notifications and streaming:**
+- **SSE**: Subscribe to `/tasks/:taskId/notifications` to receive real-time events.
+- **Webhooks**: Register an endpoint via `/tasks/:taskId/notifications` (POST) to receive push events.
 
 * * *
 
 **Usage**
 ---------
 
-1.  **Configure** `.env` with the relevant keys.
-    
-2.  **Start** the agent in development mode:
-    
+1. **Configure** `.env` with your keys.
+2. **Start** the agent in development mode:
     ```bash
     yarn dev
     ```
-    
-    The agent will then log into **Nevermined** and wait for any `step-updated` events targeting its `AGENT_DID`.
-    
-3.  **Send a Prompt**
-    
-    *   Typically, a higher-level Orchestrator (e.g., the **Music Video Orchestrator**) dispatches tasks that mention this Song Generator’s DID.
-    *   Once triggered, the agent spawns steps for metadata creation (if needed) and final audio generation.
+   The agent will wait for A2A or REST tasks.
+3. **Send a prompt** using a compatible client (see examples below).
 
 * * *
 
-**How It Works Internally**
+**Detailed Guide: Examples & Scripts**
+--------------------------------------
+
+The repository includes example scripts to interact with the agent:
+
+### 1. Classic polling (`scripts/generate-song.ts`)
+
+Launches a task and periodically checks its status until completion.
+
+```bash
+yarn generate-song
+```
+
+### 2. SSE notifications (`scripts/generate-song-with-notifications.ts`)
+
+Launches a task and subscribes to SSE events to receive real-time updates.
+
+```bash
+ts-node scripts/generate-song-with-notifications.ts "Create a pop song about summer"
+```
+
+### 3. Webhooks (`scripts/generate-song-with-webhook.ts`)
+
+Launches a task and registers a local webhook to receive push notifications.
+
+```bash
+ts-node scripts/generate-song-with-webhook.ts "Create a pop song about summer"
+```
+
+**Programmatic usage example:**
+
+```typescript
+import { generateSong } from "./scripts/generate-song";
+
+const result = await generateSong({
+  idea: "Create a happy pop song about summer",
+  title: "Summer Vibes",
+  tags: ["pop", "happy", "summer"],
+  lyrics: "We dance all night under the summer sky...",
+  duration: 180,
+});
+console.log(result);
+```
+
+* * *
+
+**How it works internally**
 ---------------------------
 
-1.  **Nevermined Subscription**
-    
-    *   `Payments.getInstance({...})` authenticates with the **Nevermined** server.
-    *   `payments.query.subscribe(processSteps(payments), {...})` sets up an event listener.
-2.  **Processing Steps**
-    
-    *   A function `processSteps(...)` receives each `step-updated` event.
-    *   It fetches the latest step info with `payments.query.getStep(...)`.
-    *   Based on `step.name`, it calls the corresponding handler function.
-3.  **Handlers**
-    
-    *   **`handleInitStep()`**: Checks for existing metadata. If missing, creates two sub-steps: `autoGenerateMetadata`, then `buildSong`. If present, only creates `buildSong`.
-    *   **`handleAutoGenerateMetadataStep()`**: Uses **LangChain** + **OpenAI** to produce a JSON object with `title`, `lyrics`, `tags`.
-    *   **`handleBuildSongStep()`**: Calls **Suno** using `SunoClient`. Waits until the job is complete, then stores the final track details.
-4.  **Logging & Error Handling**
-    
-    *   Each function logs relevant info or errors with the custom `Logger`.
-    *   If any step fails (e.g., Suno returns an error), the handler updates the step to `Failed`.
-5.  **Output Artifacts**
-    
-    *   Agents store data in `output_artifacts` (e.g., an array of objects describing the final song).
-    *   This is how other steps or orchestrators retrieve the MP3 URL, duration, or lyrics.
+- **Input**: Receives an A2A message (prompt, optional metadata).
+- **Validation**: If information is missing, requests additional input (`input-required`).
+- **Metadata generation**: Uses OpenAI (LangChain) for lyrics, title, and tags.
+- **Audio generation**: Calls Suno via API to create the track.
+- **Notifications**: Emits SSE and/or webhook events on each state change.
+- **Delivery**: Returns artifacts with the audio URL, title, duration, and lyrics.
 
 * * *
 
 **Development & Testing**
 -------------------------
 
-### Running Locally
+### Local execution
 
-*   **Start** the service in dev mode:
-    
-    ```bash
-    yarn dev
-    ```
-    
-*   By default, it subscribes to the `AGENT_DID` in your `.env`.
-    
+```bash
+yarn dev
+```
 
-### Building for Production
+By default, it subscribes to the `AGENT_DID` in your `.env`.
+
+### Build for production
 
 ```bash
 yarn build
 ```
 
+### Testing
+
+```bash
+yarn test
+```
+
 * * *
 
 **License**
------------
+------------
 
 ```
 Apache License 2.0
