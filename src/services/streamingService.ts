@@ -17,6 +17,60 @@ interface StreamingConnection {
 }
 
 /**
+ * @enum EventType
+ * @description Types of events that can be sent via SSE
+ */
+enum EventType {
+  STATUS_UPDATE = "status_update",
+  ARTIFACT = "artifact",
+  ERROR = "error",
+}
+
+/**
+ * @interface TaskStatusUpdateEvent
+ * @description Event for task status updates via SSE
+ */
+interface TaskStatusUpdateEvent {
+  id: string;
+  status: {
+    state: TaskState;
+    timestamp: string;
+    message?: any;
+  };
+  final: boolean;
+  metadata?: Record<string, any>;
+}
+
+/**
+ * @interface TaskArtifactUpdateEvent
+ * @description Event for artifact updates via SSE
+ */
+interface TaskArtifactUpdateEvent {
+  id: string;
+  artifact: {
+    parts: any[];
+    index: number;
+    append?: boolean;
+    lastChunk?: boolean;
+  };
+  metadata?: Record<string, any>;
+}
+
+/**
+ * @interface ErrorEvent
+ * @description Event for error notifications via SSE
+ */
+interface ErrorEvent {
+  id: string;
+  error: {
+    code: number;
+    message: string;
+    data?: any;
+  };
+  metadata?: Record<string, any>;
+}
+
+/**
  * @class StreamingService
  * @description Manages SSE connections and streaming events for real-time task updates
  */
@@ -59,14 +113,18 @@ export class StreamingService {
     this.connections.get(taskId)?.add(connection);
 
     // Send initial connection confirmation
-    this.sendEventToClient(connection, {
-      id: taskId,
-      status: {
-        state: TaskState.SUBMITTED,
-        timestamp: new Date().toISOString(),
+    this.sendEventToClient(
+      connection,
+      {
+        id: taskId,
+        status: {
+          state: TaskState.SUBMITTED,
+          timestamp: new Date().toISOString(),
+        },
+        final: false,
       },
-      final: false,
-    });
+      EventType.STATUS_UPDATE
+    );
 
     Logger.info(`Client subscribed to streaming events for task ${taskId}`);
 
@@ -110,20 +168,52 @@ export class StreamingService {
     const connections = this.connections.get(task.id);
     if (!connections) return;
 
-    const event = {
+    const isFinal = this.isTaskInFinalState(task.status.state);
+    const event: TaskStatusUpdateEvent = {
       id: task.id,
       status: task.status,
-      final: this.isTaskInFinalState(task.status.state),
+      final: isFinal,
     };
 
     connections.forEach((connection) => {
-      this.sendEventToClient(connection, event);
+      this.sendEventToClient(connection, event, EventType.STATUS_UPDATE);
     });
 
     // Send artifacts if available
     if (task.artifacts?.length) {
       this.sendArtifacts(task.id, task.artifacts);
     }
+  }
+
+  /**
+   * @method notifyError
+   * @description Send an error notification to all subscribed clients
+   * @param {string} taskId - The task ID
+   * @param {number} code - The error code
+   * @param {string} message - The error message
+   * @param {any} [data] - Additional error data
+   */
+  public notifyError(
+    taskId: string,
+    code: number,
+    message: string,
+    data?: any
+  ): void {
+    const connections = this.connections.get(taskId);
+    if (!connections) return;
+
+    const event: ErrorEvent = {
+      id: taskId,
+      error: {
+        code,
+        message,
+        data,
+      },
+    };
+
+    connections.forEach((connection) => {
+      this.sendEventToClient(connection, event, EventType.ERROR);
+    });
   }
 
   /**
@@ -138,17 +228,18 @@ export class StreamingService {
     if (!connections) return;
 
     artifacts.forEach((artifact) => {
-      const artifactEvent = {
+      const artifactEvent: TaskArtifactUpdateEvent = {
         id: taskId,
         artifact: {
           parts: artifact.parts,
           index: artifact.index,
-          append: false,
+          append: artifact.append || false,
+          lastChunk: artifact.index === artifacts.length - 1,
         },
       };
 
       connections.forEach((connection) => {
-        this.sendEventToClient(connection, artifactEvent);
+        this.sendEventToClient(connection, artifactEvent, EventType.ARTIFACT);
       });
     });
   }
@@ -159,10 +250,41 @@ export class StreamingService {
    * @description Send an SSE event to a client
    * @param {StreamingConnection} connection - The streaming connection
    * @param {any} event - The event data to send
+   * @param {EventType} eventType - The type of event being sent
    */
-  private sendEventToClient(connection: StreamingConnection, event: any): void {
+  private sendEventToClient(
+    connection: StreamingConnection,
+    event: any,
+    eventType: EventType
+  ): void {
     try {
-      connection.response.write(`data: ${JSON.stringify(event)}\n\n`);
+      // Format according to A2A protocol
+      const dataStr = JSON.stringify(event);
+
+      let output: string;
+
+      // Using event types according to A2A protocol
+      switch (eventType) {
+        case EventType.STATUS_UPDATE:
+          output = `event: status_update\ndata: ${dataStr}\n\n`;
+          break;
+        case EventType.ARTIFACT:
+          output = `event: artifact\ndata: ${dataStr}\n\n`;
+          break;
+        case EventType.ERROR:
+          output = `event: error\ndata: ${dataStr}\n\n`;
+          break;
+        default:
+          output = `data: ${dataStr}\n\n`;
+      }
+
+      connection.response.write(output);
+
+      // For final events in status updates, add an additional event to indicate end of stream
+      const statusEvent = event as TaskStatusUpdateEvent;
+      if (eventType === EventType.STATUS_UPDATE && statusEvent.final) {
+        connection.response.write(`event: completion\ndata: ${dataStr}\n\n`);
+      }
     } catch (error) {
       Logger.error(`Error sending event to client: ${error}`);
       this.unsubscribe(connection.taskId, connection.response);

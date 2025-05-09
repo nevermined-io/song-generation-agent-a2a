@@ -249,6 +249,48 @@ export class A2AController {
               type: "integer",
             },
           ],
+          outputSchema: {
+            "application/json": {
+              type: "object",
+              properties: {
+                title: {
+                  type: "string",
+                  description: "The title of the generated song",
+                },
+                lyrics: {
+                  type: "string",
+                  description: "The complete lyrics of the song",
+                },
+                audioUrl: {
+                  type: "string",
+                  description: "URL to the generated audio file",
+                },
+                duration: {
+                  type: "number",
+                  description: "Duration of the song in seconds",
+                },
+                genre: {
+                  type: "string",
+                  description: "Genre of the generated song",
+                },
+                tags: {
+                  type: "array",
+                  items: {
+                    type: "string",
+                  },
+                  description: "Tags describing the song",
+                },
+                metadata: {
+                  type: "object",
+                  description: "Additional metadata about the song",
+                },
+              },
+              required: ["title", "lyrics", "audioUrl"],
+            },
+            "audio/mpeg": {
+              description: "The song generated as an MP3 audio file",
+            },
+          },
         },
       ],
     });
@@ -516,20 +558,45 @@ export class A2AController {
     try {
       const { jsonrpc, id, method, params } = req.body;
       if (jsonrpc !== "2.0" || !id || !method || !params) {
-        res.status(400).json({
-          jsonrpc: "2.0",
-          id: id || null,
-          error: { code: -32600, message: "Invalid JSON-RPC 2.0 request" },
-        });
+        if (!res.headersSent) {
+          const errorCode = -32600;
+          const errorMessage = "Invalid JSON-RPC 2.0 request";
+
+          // For SSE connections, send error via streaming protocol
+          if (req.headers.accept?.includes("text/event-stream")) {
+            res.writeHead(200, {
+              "Content-Type": "text/event-stream",
+              "Cache-Control": "no-cache",
+              Connection: "keep-alive",
+            });
+            this.streamingService.notifyError(
+              params?.id || "unknown",
+              errorCode,
+              errorMessage
+            );
+            // End the response after sending the error
+            res.end();
+          } else {
+            // Regular JSON-RPC error response
+            res.status(400).json({
+              jsonrpc: "2.0",
+              id: id || null,
+              error: { code: errorCode, message: errorMessage },
+            });
+          }
+        }
         return;
       }
+
       const {
+        id: taskId,
         message,
         metadata,
         sessionId,
         acceptedOutputModes,
         notification,
       } = params;
+
       if (
         !message ||
         !message.parts ||
@@ -537,16 +604,36 @@ export class A2AController {
         !message.parts[0].text ||
         !message.parts[0].text.trim()
       ) {
-        res.status(400).json({
-          jsonrpc: "2.0",
-          id,
-          error: {
-            code: -32602,
-            message: "Task must contain a non-empty message text",
-          },
-        });
+        if (!res.headersSent) {
+          const errorCode = -32602;
+          const errorMessage = "Task must contain a non-empty message text";
+
+          // For SSE connections, send error via streaming protocol
+          if (req.headers.accept?.includes("text/event-stream")) {
+            res.writeHead(200, {
+              "Content-Type": "text/event-stream",
+              "Cache-Control": "no-cache",
+              Connection: "keep-alive",
+            });
+            this.streamingService.notifyError(
+              taskId || "unknown",
+              errorCode,
+              errorMessage
+            );
+            // End the response after sending the error
+            res.end();
+          } else {
+            // Regular JSON-RPC error response
+            res.status(400).json({
+              jsonrpc: "2.0",
+              id,
+              error: { code: errorCode, message: errorMessage },
+            });
+          }
+        }
         return;
       }
+
       // 1. Create the task
       const task = await this.createTask({
         sessionId,
@@ -554,36 +641,60 @@ export class A2AController {
         metadata,
         acceptedOutputModes,
       });
-      const taskId = task.id;
+
       // 2. Check notification mode
       const mode = notification?.mode || "sse";
       const eventTypes = notification?.eventTypes || [];
+
       if (mode === "webhook" && notification?.url) {
         // Register webhook and respond immediately
-        await this.pushNotificationService.subscribeWebhook(taskId, {
-          taskId,
+        await this.pushNotificationService.subscribeWebhook(task.id, {
+          taskId: task.id,
           webhookUrl: notification.url,
           eventTypes,
         });
+
         res.json({
           jsonrpc: "2.0",
           id,
-          result: { taskId },
+          result: { taskId: task.id },
         });
         return;
       }
+
       // Default: SSE mode (keep connection open)
-      this.pushNotificationService.subscribeSSE(taskId, res, {
-        taskId,
-        eventTypes,
-      });
+      this.streamingService.subscribe(task.id, res);
+
+      // Start processing the task
+      this.taskQueue.enqueueTask(task);
     } catch (error) {
       if (!res.headersSent) {
-        res.status(500).json({
-          jsonrpc: "2.0",
-          id: req.body?.id || null,
-          error: { code: -32000, message: (error as Error).message },
-        });
+        const errorCode = -32000;
+        const errorMessage =
+          (error as Error).message || "Internal server error";
+
+        // For SSE connections, send error via streaming protocol
+        if (req.headers.accept?.includes("text/event-stream")) {
+          res.writeHead(200, {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive",
+          });
+          this.streamingService.notifyError(
+            req.body?.params?.id || "unknown",
+            errorCode,
+            errorMessage
+          );
+          // End the response after sending the error
+          res.end();
+        } else {
+          // Regular JSON-RPC error response
+          res.status(500).json({
+            jsonrpc: "2.0",
+            id: req.body?.id || null,
+            error: { code: errorCode, message: errorMessage },
+          });
+        }
       }
     }
   };

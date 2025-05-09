@@ -156,7 +156,30 @@ export class PushNotificationService {
    */
   private sendEventToClient(res: Response, event: PushNotificationEvent): void {
     try {
-      res.write(`data: ${JSON.stringify(event)}\n\n`);
+      const eventData = JSON.stringify(event);
+
+      // Format according to A2A protocol
+      let output: string;
+
+      // Map PushNotificationEventType to appropriate event type name
+      switch (event.type) {
+        case PushNotificationEventType.STATUS_UPDATE:
+          output = `event: status_update\ndata: ${eventData}\n\n`;
+          break;
+        case PushNotificationEventType.ARTIFACT_CREATED:
+          output = `event: artifact\ndata: ${eventData}\n\n`;
+          break;
+        case PushNotificationEventType.ERROR:
+          output = `event: error\ndata: ${eventData}\n\n`;
+          break;
+        case PushNotificationEventType.COMPLETION:
+          output = `event: completion\ndata: ${eventData}\n\n`;
+          break;
+        default:
+          output = `data: ${eventData}\n\n`;
+      }
+
+      res.write(output);
     } catch (error) {
       Logger.error(`Error sending event to client: ${error}`);
       this.unsubscribe(event.taskId, res);
