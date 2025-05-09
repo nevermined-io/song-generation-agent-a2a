@@ -199,7 +199,7 @@ ${JSON.stringify(partialMetadata, null, 2)}
 
     // Validate tags
     if (!Array.isArray(json.tags)) return false;
-    if (json.tags.length < 3 || json.tags.length > 5) return false;
+    if (json.tags.length < 3 || json.tags.length > 8) return false;
     if (
       !json.tags.every(
         (tag: unknown) => typeof tag === "string" && tag.trim() !== ""

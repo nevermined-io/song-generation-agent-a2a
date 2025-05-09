@@ -14,6 +14,7 @@ import {
 import { SongMetadata, SongGenerationResult } from "../models/song";
 import { SongMetadataGenerator } from "../core/songMetadataGenerator";
 import { SunoClient } from "../clients/sunoClient";
+import { SunoClientDemo } from "../clients/sunoClientDemo";
 import { Logger } from "../utils/logger";
 import { StatusData } from "../interfaces/apiResponses";
 
@@ -23,7 +24,7 @@ import { StatusData } from "../interfaces/apiResponses";
  */
 export class SongGenerationController {
   private readonly metadataGenerator: SongMetadataGenerator;
-  private readonly sunoClient: SunoClient;
+  private readonly sunoClient: SunoClient | SunoClientDemo;
 
   /**
    * @constructor
@@ -35,7 +36,12 @@ export class SongGenerationController {
       throw new Error("Both OpenAI and Suno API keys are required");
     }
     this.metadataGenerator = new SongMetadataGenerator(openAiKey);
-    this.sunoClient = new SunoClient({ apiKey: sunoKey });
+    // Use SunoClientDemo if DEMO_MODE is set, otherwise use SunoClient
+    if (process.env.DEMO_MODE === "true") {
+      this.sunoClient = new SunoClientDemo({ apiKey: sunoKey });
+    } else {
+      this.sunoClient = new SunoClient({ apiKey: sunoKey });
+    }
   }
 
   /**

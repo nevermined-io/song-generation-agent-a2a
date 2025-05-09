@@ -104,28 +104,13 @@ export class A2AController {
    */
   private setupTaskStoreListeners(): void {
     this.taskStore.addStatusListener(async (task: Task) => {
-      // Handle push notifications
-      const event: PushNotificationEvent = {
-        type: PushNotificationEventType.STATUS_UPDATE,
-        taskId: task.id,
-        timestamp: new Date().toISOString(),
-        data: {
-          status: task.status,
-          artifacts: task.artifacts,
-        },
-      };
-
-      this.pushNotificationService.notify(task.id, event);
-
-      // Handle streaming updates
-      this.streamingService.notifyTaskUpdate(task);
-
-      // Send completion event if task is in final state
-      if (
+      // Only send status_update if not in a final state
+      const isFinal =
         task.status.state === TaskState.COMPLETED ||
         task.status.state === TaskState.CANCELLED ||
-        task.status.state === TaskState.FAILED
-      ) {
+        task.status.state === TaskState.FAILED;
+
+      if (isFinal) {
         const completionEvent: PushNotificationEvent = {
           type: PushNotificationEventType.COMPLETION,
           taskId: task.id,
@@ -136,7 +121,21 @@ export class A2AController {
           },
         };
         this.pushNotificationService.notify(task.id, completionEvent);
+      } else {
+        const event: PushNotificationEvent = {
+          type: PushNotificationEventType.STATUS_UPDATE,
+          taskId: task.id,
+          timestamp: new Date().toISOString(),
+          data: {
+            status: task.status,
+            artifacts: task.artifacts,
+          },
+        };
+        this.pushNotificationService.notify(task.id, event);
       }
+
+      // Handle streaming updates
+      this.streamingService.notifyTaskUpdate(task);
     });
   }
 
@@ -571,7 +570,6 @@ export class A2AController {
           id,
           result: { taskId },
         });
-        await this.taskQueue.enqueueTask(task);
         return;
       }
       // Default: SSE mode (keep connection open)
@@ -579,7 +577,6 @@ export class A2AController {
         taskId,
         eventTypes,
       });
-      await this.taskQueue.enqueueTask(task);
     } catch (error) {
       if (!res.headersSent) {
         res.status(500).json({
