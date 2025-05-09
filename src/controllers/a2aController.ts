@@ -171,6 +171,47 @@ export class A2AController {
       },
       defaultInputModes: ["text/plain", "application/json"],
       defaultOutputModes: ["application/json", "audio/mpeg", "text/plain"],
+      outputFormats: {
+        "application/json": {
+          description:
+            "Structured JSON response containing song information including title, lyrics, and audio URL",
+          schema: {
+            type: "object",
+            properties: {
+              title: { type: "string", description: "The song title" },
+              lyrics: {
+                type: "string",
+                description: "The complete song lyrics",
+              },
+              audioUrl: {
+                type: "string",
+                description: "URL to the audio file",
+              },
+              duration: {
+                type: "number",
+                description: "Song duration in seconds",
+              },
+              tags: {
+                type: "array",
+                items: { type: "string" },
+                description: "Tags associated with the song",
+              },
+              musicId: {
+                type: "string",
+                description: "Unique identifier for the generated music",
+              },
+            },
+            required: ["title", "lyrics", "audioUrl"],
+          },
+        },
+        "audio/mpeg": {
+          description: "MP3 audio file containing the generated song",
+        },
+        "text/plain": {
+          description:
+            "Plain text response, typically containing the lyrics of the generated song",
+        },
+      },
       notificationEvents: [
         {
           type: "status_update",
@@ -280,6 +321,10 @@ export class A2AController {
                   },
                   description: "Tags describing the song",
                 },
+                musicId: {
+                  type: "string",
+                  description: "Unique identifier for the generated music",
+                },
                 metadata: {
                   type: "object",
                   description: "Additional metadata about the song",
@@ -291,6 +336,28 @@ export class A2AController {
               description: "The song generated as an MP3 audio file",
             },
           },
+          outputExamples: [
+            {
+              mimeType: "application/json",
+              description: "Example of a song generation result",
+              content: {
+                title: "Summer Adventures",
+                lyrics:
+                  "Verse 1:\nThe sun is shining bright today\nAs we set out on our way\n\nChorus:\nSummer adventures, feeling alive\nThese are the days we'll remember all our lives",
+                audioUrl:
+                  "https://api.nevermined.io/songs/summer-adventures.mp3",
+                duration: 180.5,
+                genre: "Pop",
+                tags: ["summer", "happy", "adventures", "pop"],
+                musicId: "summer-adventures-123",
+                metadata: {
+                  bpm: 120,
+                  key: "C Major",
+                  createdAt: "2023-07-15T14:30:22Z",
+                },
+              },
+            },
+          ],
         },
       ],
     });
