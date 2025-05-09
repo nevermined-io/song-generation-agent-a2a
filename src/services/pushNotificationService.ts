@@ -126,6 +126,7 @@ export class PushNotificationService {
   public notify(taskId: string, event: PushNotificationEvent): void {
     const connections = this.connections.get(taskId);
     const config = this.subscriptions.get(taskId);
+    Logger.info(`Notifying task ${taskId} with event ${event.type}`);
 
     if (!config) {
       return;

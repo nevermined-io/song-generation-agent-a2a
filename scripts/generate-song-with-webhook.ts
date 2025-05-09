@@ -1,7 +1,8 @@
 /**
  * Script to generate a song using the Nevermined agent with webhook notifications
  * Instead of SSE, it registers a webhook and receives notifications via HTTP POST
- * @todo Remove the express server after testing
+ *
+ * This script is now fully compliant with the A2A protocol (JSON-RPC 2.0) and uses the notification.mode field.
  */
 
 import axios, { AxiosError } from "axios";
@@ -27,7 +28,6 @@ async function startWebhookServer(): Promise<string> {
     const app = express();
     app.use(bodyParser.json());
 
-    //TODO: remove after testing
     app.post(CONFIG.webhookPath, (req, res) => {
       console.log(
         "[Webhook Client] Notification received:",
@@ -46,7 +46,7 @@ async function startWebhookServer(): Promise<string> {
 }
 
 /**
- * Creates a new song generation task (JSON-RPC 2.0)
+ * Creates a new song generation task (JSON-RPC 2.0, webhook notification)
  * @param {Object} params Song generation parameters
  * @returns {Promise<string>} Task ID
  */
@@ -57,6 +57,7 @@ async function createSongTask(params: {
   lyrics?: string;
   duration?: number;
   sessionId?: string;
+  webhookUrl: string;
 }): Promise<string> {
   try {
     // Build the message and metadata according to A2A
@@ -70,17 +71,21 @@ async function createSongTask(params: {
     if (params.lyrics) metadata.lyrics = params.lyrics;
     if (params.duration) metadata.duration = params.duration;
 
-    // JSON-RPC 2.0 request body
+    // JSON-RPC 2.0 request body with webhook notification
     const jsonRpcRequest = {
       jsonrpc: "2.0",
       id: uuidv4(),
       method: "tasks/sendSubscribe",
       params: {
-        id: uuidv4(),
         sessionId: params.sessionId || uuidv4(),
         message,
         metadata,
         acceptedOutputModes: ["text"],
+        notification: {
+          mode: "webhook",
+          url: params.webhookUrl,
+          eventTypes: CONFIG.eventTypes,
+        },
       },
     };
 
@@ -90,10 +95,10 @@ async function createSongTask(params: {
       jsonRpcRequest
     );
     console.log("Server response:", response.data);
-    if (response.data && response.data.result && response.data.result.id) {
-      return response.data.result.id;
+    if (response.data && response.data.result && response.data.result.taskId) {
+      return response.data.result.taskId;
     }
-    throw new Error("Invalid response from server: missing result.id");
+    throw new Error("Invalid response from server: missing result.taskId");
   } catch (error) {
     if (error instanceof AxiosError) {
       console.error("API Response:", error.response?.data);
@@ -102,37 +107,6 @@ async function createSongTask(params: {
       );
     }
     throw new Error("Failed to create song generation task: Unknown error");
-  }
-}
-
-/**
- * Registers a webhook for receiving notifications for a task
- * @param {string} taskId The task ID
- * @param {string} webhookUrl The webhook URL
- * @returns {Promise<void>}
- */
-async function registerWebhook(
-  taskId: string,
-  webhookUrl: string
-): Promise<void> {
-  try {
-    const config = {
-      taskId,
-      eventTypes: CONFIG.eventTypes,
-      webhookUrl,
-    };
-    console.log("Registering webhook:", config);
-    const response = await axios.post(
-      `${CONFIG.serverUrl}/tasks/${taskId}/notifications`,
-      config
-    );
-    console.log("Webhook registration response:", response.data);
-  } catch (error) {
-    if (error instanceof AxiosError) {
-      console.error("Webhook registration error:", error.response?.data);
-      throw new Error(`Failed to register webhook: ${error.message}`);
-    }
-    throw new Error("Failed to register webhook: Unknown error");
   }
 }
 
@@ -158,12 +132,9 @@ async function generateSongWithWebhook(songParams: {
   // Start webhook server
   const webhookUrl = await startWebhookServer();
 
-  // Create task
-  const taskId = await createSongTask(songParams);
+  // Create task (registers webhook in the same call)
+  const taskId = await createSongTask({ ...songParams, webhookUrl });
   console.log(`Task created with ID: ${taskId}`);
-
-  // Register webhook
-  await registerWebhook(taskId, webhookUrl);
 
   console.log("Waiting for webhook notifications... (press Ctrl+C to exit)");
 }

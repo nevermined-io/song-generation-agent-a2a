@@ -276,48 +276,72 @@ The agent implements the **A2A** (Agent-to-Agent) protocol, which defines:
 **A2A Protocol and API Endpoints**
 ----------------------------------
 
-All API endpoints for task creation now require **JSON-RPC 2.0** requests and responses, as per the A2A protocol. This applies to both `/tasks/send` and `/tasks/sendSubscribe`.
+All API endpoints for task creation now require **JSON-RPC 2.0** requests and responses, as per the A2A protocol. This applies to `/tasks/send` and `/tasks/sendSubscribe`.
 
 - **Endpoint for single-turn tasks:**
   - `POST /tasks/send`
 - **Endpoint for streaming/multi-turn tasks:**
   - `POST /tasks/sendSubscribe`
 
+**Notification Modes**
+----------------------
+
+The `/tasks/sendSubscribe` endpoint supports two notification modes, controlled by the `notification.mode` field in the request `params`:
+
+- **SSE (Server-Sent Events):** Default mode. The HTTP connection remains open and the server streams events to the client.
+- **Webhook:** The server sends notifications to a client-provided URL via HTTP POST.
+
 **Request format (JSON-RPC 2.0):**
 
+*For SSE (default):*
 ```json
 {
   "jsonrpc": "2.0",
   "id": "client-request-id",
-  "method": "tasks/sendSubscribe", // or "tasks/send"
+  "method": "tasks/sendSubscribe",
   "params": {
-    "id": "unique-task-id",
-    "sessionId": "user-session-123",
-    "acceptedOutputModes": ["text"],
-    "message": {
-      "role": "user",
-      "parts": [
-        { "type": "text", "text": "Create a happy pop song about summer" }
-      ]
-    },
-    "metadata": {}
+    "message": { ... },
+    "notification": {
+      "mode": "sse",
+      "eventTypes": ["status_update", "completion"]
+    }
+  }
+}
+```
+
+*For Webhook:*
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "client-request-id",
+  "method": "tasks/sendSubscribe",
+  "params": {
+    "message": { ... },
+    "notification": {
+      "mode": "webhook",
+      "url": "https://yourapp.com/webhook-endpoint",
+      "eventTypes": ["status_update", "completion"]
+    }
   }
 }
 ```
 
 **Response format (JSON-RPC 2.0):**
 
+- For SSE: The connection remains open and events are streamed.
+- For Webhook: The server responds immediately with the taskId and sends notifications to the provided URL.
+
+**Example event payload:**
 ```json
 {
-  "jsonrpc": "2.0",
-  "id": "client-request-id",
-  "result": {
-    // ...task object...
-  }
+  "type": "status_update",
+  "taskId": "...",
+  "timestamp": "...",
+  "data": { ... }
 }
 ```
 
-> **Note:** All scripts and clients must use this JSON-RPC 2.0 envelope for requests and expect the same for responses. See the updated example scripts for reference.
+**Note:** The client must specify the notification mode in the request. If not specified, SSE is used by default.
 
 * * *
 

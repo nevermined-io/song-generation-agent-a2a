@@ -506,7 +506,7 @@ export class A2AController {
 
   /**
    * @method sendTaskSubscribe
-   * @description Handle JSON-RPC 2.0 A2A task send with subscription (multi-turn/streaming)
+   * @description Handle JSON-RPC 2.0 A2A task send with subscription (multi-turn/streaming, SSE or webhook)
    * @param {Request} req - Express request
    * @param {Response} res - Express response
    */
@@ -524,7 +524,13 @@ export class A2AController {
         });
         return;
       }
-      const { message, metadata, sessionId, acceptedOutputModes } = params;
+      const {
+        message,
+        metadata,
+        sessionId,
+        acceptedOutputModes,
+        notification,
+      } = params;
       if (
         !message ||
         !message.parts ||
@@ -542,26 +548,46 @@ export class A2AController {
         });
         return;
       }
+      // 1. Create the task
       const task = await this.createTask({
         sessionId,
         message,
         metadata,
         acceptedOutputModes,
       });
-      // Respond immediately with JSON-RPC envelope
-      res.json({
-        jsonrpc: "2.0",
-        id,
-        result: task,
+      const taskId = task.id;
+      // 2. Check notification mode
+      const mode = notification?.mode || "sse";
+      const eventTypes = notification?.eventTypes || [];
+      if (mode === "webhook" && notification?.url) {
+        // Register webhook and respond immediately
+        await this.pushNotificationService.subscribeWebhook(taskId, {
+          taskId,
+          webhookUrl: notification.url,
+          eventTypes,
+        });
+        res.json({
+          jsonrpc: "2.0",
+          id,
+          result: { taskId },
+        });
+        await this.taskQueue.enqueueTask(task);
+        return;
+      }
+      // Default: SSE mode (keep connection open)
+      this.pushNotificationService.subscribeSSE(taskId, res, {
+        taskId,
+        eventTypes,
       });
-      // Enqueue the task for processing (do not await)
       await this.taskQueue.enqueueTask(task);
     } catch (error) {
-      res.status(500).json({
-        jsonrpc: "2.0",
-        id: req.body?.id || null,
-        error: { code: -32000, message: (error as Error).message },
-      });
+      if (!res.headersSent) {
+        res.status(500).json({
+          jsonrpc: "2.0",
+          id: req.body?.id || null,
+          error: { code: -32000, message: (error as Error).message },
+        });
+      }
     }
   };
 
@@ -582,87 +608,6 @@ export class A2AController {
       res.json(task.history || []);
     } catch (error) {
       ErrorHandler.handleHttpError(error as Error, res);
-    }
-  };
-
-  /**
-   * @method subscribeSSE
-   * @description Subscribe a client to SSE notifications for a task
-   */
-  public subscribeSSE = async (req: Request, res: Response): Promise<void> => {
-    try {
-      const taskId = req.params.taskId;
-      const config: PushNotificationConfig = {
-        taskId,
-        eventTypes: req.query.eventTypes
-          ? ((req.query.eventTypes as string)
-              .split(",")
-              .map((type) => type.toLowerCase())
-              .map((type) => {
-                switch (type) {
-                  case "status_update":
-                    return PushNotificationEventType.STATUS_UPDATE;
-                  case "artifact_created":
-                    return PushNotificationEventType.ARTIFACT_CREATED;
-                  case "error":
-                    return PushNotificationEventType.ERROR;
-                  case "completion":
-                    return PushNotificationEventType.COMPLETION;
-                  default:
-                    return undefined;
-                }
-              })
-              .filter((t) => t !== undefined) as PushNotificationEventType[])
-          : [],
-      };
-      const task = await this.getTask(taskId);
-      if (!task) {
-        res.status(404).json({ error: "Task not found" });
-        return;
-      }
-      this.pushNotificationService.subscribeSSE(taskId, res, config);
-    } catch (error) {
-      Logger.error(
-        `Error setting up SSE subscription: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
-      if (!res.headersSent) {
-        ErrorHandler.handleHttpError(error as Error, res);
-      }
-    }
-  };
-
-  /**
-   * @method subscribeWebhook
-   * @description Register a webhook for push notifications for a task
-   */
-  public subscribeWebhook = async (
-    req: Request,
-    res: Response
-  ): Promise<void> => {
-    try {
-      const taskId = req.params.taskId;
-      const config: PushNotificationConfig = req.body;
-      const task = await this.getTask(taskId);
-      if (!task) {
-        res.status(404).json({ error: "Task not found" });
-        return;
-      }
-      await this.pushNotificationService.subscribeWebhook(taskId, config);
-      res.json({
-        success: true,
-        message: "Push notification webhook configured",
-      });
-    } catch (error) {
-      Logger.error(
-        `Error setting up webhook: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
-      if (!res.headersSent) {
-        ErrorHandler.handleHttpError(error as Error, res);
-      }
     }
   };
 

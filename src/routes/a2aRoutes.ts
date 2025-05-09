@@ -33,8 +33,4 @@ router.get("/tasks/:taskId", controller.getTaskStatus);
 router.post("/tasks/:taskId/cancel", controller.cancelTask);
 router.get("/tasks/:taskId/history", controller.getTaskHistory);
 
-// Push notifications
-router.post("/tasks/:taskId/notifications", controller.subscribeWebhook);
-router.get("/tasks/:taskId/notifications", controller.subscribeSSE);
-
 export default router;
