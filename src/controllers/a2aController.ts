@@ -731,9 +731,6 @@ export class A2AController {
 
       // Default: SSE mode (keep connection open)
       this.streamingService.subscribe(task.id, res);
-
-      // Start processing the task
-      this.taskQueue.enqueueTask(task);
     } catch (error) {
       if (!res.headersSent) {
         const errorCode = -32000;
