@@ -112,6 +112,7 @@ export class TaskQueue {
       this.processing.delete(task.id);
       this.completed.add(task.id);
       Logger.info(`Task ${task.id} completed successfully`);
+      await this.processNextTasks();
     } catch (error) {
       const retries = this.retryCount.get(task.id) || 0;
 
@@ -140,6 +141,7 @@ export class TaskQueue {
         );
         this.processing.delete(task.id);
         this.failed.add(task.id);
+        await this.processNextTasks();
       }
     }
   }
