@@ -77,14 +77,14 @@ export class SunoClientDemo {
       jobId: "demo-job-id",
       error: undefined,
     };
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 30000));
     yield {
       status: "working",
       progress: 100,
       jobId: "demo-job-id",
       error: undefined,
     };
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 30000));
     return this.getSong(taskId);
   }
 

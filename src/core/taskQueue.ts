@@ -77,10 +77,8 @@ export class TaskQueue {
    */
   private async processNextTasks(): Promise<void> {
     try {
-      while (
-        this.queue.length > 0 &&
-        this.processing.size < this.config.maxConcurrent
-      ) {
+      const availableSlots = this.config.maxConcurrent - this.processing.size;
+      for (let i = 0; i < availableSlots && this.queue.length > 0; i++) {
         const task = this.queue.shift();
         if (!task) continue;
 
