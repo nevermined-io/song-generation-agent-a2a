@@ -132,17 +132,45 @@ export class TaskProcessor {
         throw new Error(`Task ${task.id} not found`);
       }
 
+      // Only update and notify if state or progress text changes
+      const lastStatus = currentTask.status;
+      const lastHistory = currentTask.history || [];
+      const lastProgress =
+        lastHistory.length > 0
+          ? lastHistory[lastHistory.length - 1]
+          : undefined;
+      const isStateChanged = lastStatus?.state !== state;
+      let isProgressChanged = false;
+      if (
+        message &&
+        lastProgress &&
+        message.parts &&
+        lastProgress.message &&
+        lastProgress.message.parts
+      ) {
+        // Compare progress text if present
+        const lastText = lastProgress.message.parts.find(
+          (p: any) => p.type === "text"
+        )?.text;
+        const newText = message.parts.find((p: any) => p.type === "text")?.text;
+        isProgressChanged = lastText !== newText;
+      }
+
+      if (!isStateChanged && !isProgressChanged) {
+        return;
+      }
+
       const statusUpdate = {
         state,
         timestamp,
         message,
-        artifacts,
       };
 
       const updatedTask = {
         ...currentTask,
         status: statusUpdate,
         history: [...(currentTask.history || []), statusUpdate],
+        ...(artifacts ? { artifacts } : {}),
       };
 
       await this.taskStore.updateTask(updatedTask);

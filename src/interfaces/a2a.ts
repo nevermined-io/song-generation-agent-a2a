@@ -26,7 +26,7 @@ export type MessageRole = "user" | "agent";
  * @type MessagePartType
  * @description Message part types supported by the protocol
  */
-export type MessagePartType = "text" | "image" | "audio" | "file";
+export type MessagePartType = "text" | "image" | "audio" | "file" | "data";
 
 /**
  * @interface MessagePart
@@ -40,6 +40,7 @@ export interface MessagePart {
     bytes: string;
     name: string;
   };
+  data?: any;
 }
 
 /**
@@ -73,6 +74,7 @@ export interface TaskArtifactPart {
     bytes: string;
     name: string;
   };
+  data?: any;
 }
 
 /**

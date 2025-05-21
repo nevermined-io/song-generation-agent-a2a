@@ -101,18 +101,14 @@ export class SongGenerationController {
           audioUrl: songData.music.audioUrl,
         },
         {
-          type: "text",
-          text: JSON.stringify(
-            {
-              title: metadata.title,
-              lyrics: metadata.lyrics,
-              tags: metadata.tags,
-              duration: songData.music.duration,
-              musicId: songData.music.musicId,
-            },
-            null,
-            2
-          ),
+          type: "data",
+          data: {
+            title: metadata.title,
+            lyrics: metadata.lyrics,
+            tags: metadata.tags,
+            duration: songData.music.duration,
+            musicId: songData.music.musicId,
+          },
         },
       ],
       metadata: {
