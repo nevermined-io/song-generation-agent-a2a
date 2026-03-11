@@ -24,7 +24,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "eventsource": "^2.0.2",
-    "express": "^4.18.3",
+    "express": "^4.22.1",
     "langchain": "^0.1.25",
     "music-metadata": "^7.14.0",
     "openai": "^4.28.4",
